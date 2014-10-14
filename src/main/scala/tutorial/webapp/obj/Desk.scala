@@ -9,7 +9,9 @@ class Desk(points: Field) {
 
   protected def copy(patch: Field => Field) = new Desk(patch(points))
 
-  def apply(x: Int, y: Int): Item = points(x)(y)
+  def get(x: Int, y: Int): Item = points(x)(y)
+
+  def apply(x: Int, y: Int): Item = get(x, y)
 
   def updated(x: Int, y: Int, value: Item) = copy(p => p.updated(x, p(x).updated(y, value)))
 
@@ -38,6 +40,10 @@ class Desk(points: Field) {
     case Up | Down => verticalProj
   }
 
+  override def toString: String = {
+    val strRepr = points.map(_.map(_.fold(" ")(_.toString)).mkString(" | ")).mkString("\r\n")
+    s"Desk:\r\n$strRepr"
+  }
 }
 
 object Desk {
@@ -45,15 +51,22 @@ object Desk {
 
   def shift(vector: Row): Row = vector match {
     case Nil => Nil
-    case n :: Nil => vector
-    case None :: tail =>
-      tail.find(_.nonEmpty).fold(vector) { case nonEmptyEl =>
-        nonEmptyEl :: shift(tail.updated(tail.indexOf(nonEmptyEl), None))
+    // If current element is not empty,
+    // find first non-empty element after current and check if it is the same as current.
+    // If it is the same, square current element, and replace matched element with empty element
+    case Some(a) :: tail =>
+      tail.find(_.nonEmpty).filter(_.contains(a)) match {
+        case Some(sameEl) => Some(a * a) :: shift(tail.updated(tail.indexOf(sameEl), None))
+        case None => Some(a) :: shift(tail)
       }
-    case Some(a) :: Some(b) :: tail if a == b =>
-      Some(a * b) :: shift(tail) ++ (None :: Nil)
-    case head :: tail =>
-      head :: shift(tail)
+    // If current element is empty,
+    // find first non-empty element and shift it to the current position,
+    // replacing by empty element and repeating shifting procedure starting from new current element
+    case None :: tail =>
+      tail.find(_.nonEmpty) match {
+        case Some(nonEmptyEl) => shift(nonEmptyEl :: tail.updated(tail.indexOf(nonEmptyEl), None))
+        case None => vector // Empty elements everywhere, no need to check next
+      }
   }
 
   def mkMove(initial: Desk, move: Movement): Desk = {
